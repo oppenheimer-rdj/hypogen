@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { WALKTHROUGH } from "./walkthrough";
+import { WALKTHROUGH } from "./walkthroughData";
 
 interface Props {
   onClose: () => void;

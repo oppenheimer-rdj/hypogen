@@ -3,7 +3,7 @@ import { generateHypothesis, getPapers } from "./api";
 import Result from "./Result";
 import Sidebar from "./Sidebar";
 import Walkthrough from "./Walkthrough";
-import { EXAMPLE_QUESTION } from "./walkthrough";
+import { EXAMPLE_QUESTION } from "./walkthroughData";
 import type { ExperimentFields, Msg, PaperInfo } from "./types";
 
 const DEFAULT_FIELDS: ExperimentFields = {
