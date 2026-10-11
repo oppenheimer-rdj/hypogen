@@ -1,0 +1,28 @@
+:root { --bg:#f6f8fb; --card:#fff; --ink:#14213d; --mute:#5b6577; --line:#dbe2ec; --teal:#0f7b7b; --amber:#b7791f; --red:#b83232; --green:#1f8a4c; --purple:#6b46c1; }
+* { box-sizing: border-box; }
+body { margin: 0; font-family: system-ui, "Segoe UI", Arial, sans-serif; background: var(--bg); color: var(--ink); }
+header { padding: 18px 28px; background: var(--ink); color: #fff; }
+header h1 { margin: 0; font-size: 22px; }
+header p { margin: 4px 0 0; color: #c7d0e0; font-size: 13px; }
+main { display: grid; grid-template-columns: 380px 1fr; gap: 20px; padding: 20px 28px; max-width: 1300px; margin: auto; }
+@media (max-width: 900px) { main { grid-template-columns: 1fr; } }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 16px; margin-bottom: 16px; }
+h2 { font-size: 15px; margin: 0 0 10px; color: var(--teal); text-transform: uppercase; letter-spacing: .04em; }
+label { display: block; font-size: 12px; color: var(--mute); margin: 10px 0 3px; }
+input, textarea { width: 100%; padding: 8px; border: 1px solid var(--line); border-radius: 6px; font: inherit; font-size: 14px; }
+textarea { min-height: 70px; resize: vertical; }
+button { margin-top: 12px; padding: 10px 16px; border: 0; border-radius: 6px; background: var(--teal); color: #fff; font-weight: 600; cursor: pointer; font-size: 14px; }
+button.secondary { background: var(--purple); }
+button:disabled { opacity: .5; cursor: wait; }
+.badge { display: inline-block; padding: 2px 9px; border-radius: 20px; font-size: 12px; font-weight: 700; color: #fff; }
+.supports { background: var(--green); } .contradicts { background: var(--red); }
+.insufficient { background: #7a8599; } .mixed { background: var(--amber); }
+.premise { border-left: 4px solid var(--line); padding: 8px 12px; margin: 10px 0; background: #fbfcfe; }
+.ev { font-size: 13px; color: var(--mute); margin: 6px 0 0 12px; padding-left: 8px; border-left: 2px solid var(--line); }
+.warn { background: #fff6e5; border: 1px solid #f0d49a; color: #6b4a0c; padding: 8px 12px; border-radius: 6px; margin: 6px 0; font-size: 13px; }
+.small { font-size: 12px; color: var(--mute); }
+.cite { font-family: monospace; font-size: 12px; color: var(--purple); }
+.missing { color: var(--red); font-weight: 700; }
+.stage { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+.stage span { font-size: 11px; padding: 3px 8px; background: #e6f3f3; color: var(--teal); border-radius: 4px; }
+.note { font-size: 12px; background: #f0ecfa; border: 1px solid #d9cff3; padding: 8px 10px; border-radius: 6px; color: #3d2a73; }
