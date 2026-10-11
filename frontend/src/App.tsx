@@ -1,12 +1,12 @@
-import { useState } from "react";
-import { addPaper, generateHypothesis } from "./api";
-import type { HypothesisRequest, HypothesisResult } from "./types";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { generateHypothesis, getPapers } from "./api";
+import Result from "./Result";
+import Sidebar from "./Sidebar";
+import Walkthrough from "./Walkthrough";
+import { EXAMPLE_QUESTION } from "./walkthrough";
+import type { ExperimentFields, Msg, PaperInfo } from "./types";
 
-const EXPERIMENT_KEYS = ["intervention", "comparator", "task", "metric", "disconfirming_outcome"];
-
-const DEFAULTS: HypothesisRequest = {
-  question:
-    "Does data augmentation or self-training help text classification when only a few labelled examples are available?",
+const DEFAULT_FIELDS: ExperimentFields = {
   intervention: "self-training with pseudo-labels",
   comparator: "plain supervised fine-tuning",
   task: "sentiment classification, 100 labelled examples",
@@ -14,172 +14,174 @@ const DEFAULTS: HypothesisRequest = {
   disconfirm: "no gain larger than seed-to-seed variance",
 };
 
-const STAGES = ["Retrieve", "Draft", "Check premises", "Check experiment", "Warn", "Researcher review"];
+const FIELD_LABELS: Record<keyof ExperimentFields, string> = {
+  intervention: "Intervention (what you change)",
+  comparator: "Comparator (what you compare against)",
+  task: "Dataset / task",
+  metric: "Metric",
+  disconfirm: "What result would disprove it?",
+};
+
+const EXAMPLES = [
+  EXAMPLE_QUESTION,
+  "Is few-shot fine-tuning reliable across random seeds?",
+  "How should I compare low-resource text classification methods fairly?",
+];
+
+let nextId = 1;
 
 export default function App() {
-  const [form, setForm] = useState<HypothesisRequest>(DEFAULTS);
-  const [result, setResult] = useState<HypothesisResult | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [paperName, setPaperName] = useState("");
-  const [paperText, setPaperText] = useState("");
-  const [paperMsg, setPaperMsg] = useState("");
+  const [msgs, setMsgs] = useState<Msg[]>([]);
+  const [papers, setPapers] = useState<PaperInfo[]>([]);
+  const [input, setInput] = useState("");
+  const [fields, setFields] = useState<ExperimentFields>(DEFAULT_FIELDS);
+  const [showFields, setShowFields] = useState(false);
+  const [showWalk, setShowWalk] = useState(false);
+  const [backendDown, setBackendDown] = useState(false);
+  const bottom = useRef<HTMLDivElement>(null);
 
-  const set = (k: keyof HypothesisRequest) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
-    setForm({ ...form, [k]: e.target.value });
+  const refreshPapers = useCallback(() => {
+    getPapers()
+      .then((p) => {
+        setPapers(p);
+        setBackendDown(false);
+      })
+      .catch(() => setBackendDown(true));
+  }, []);
 
-  async function run() {
-    setBusy(true);
-    setError(null);
+  useEffect(refreshPapers, [refreshPapers]);
+  useEffect(() => {
+    bottom.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+  }, [msgs]);
+
+  const busy = msgs.some((m) => m.pending);
+
+  async function send(question: string) {
+    const q = question.trim();
+    if (!q || busy) return;
+    const userId = nextId++;
+    const botId = nextId++;
+    setInput("");
+    setMsgs((m) => [...m, { id: userId, role: "user", text: q }, { id: botId, role: "assistant", pending: true }]);
     try {
-      setResult(await generateHypothesis(form));
+      const result = await generateHypothesis({ question: q, ...fields });
+      setMsgs((m) => m.map((x) => (x.id === botId ? { id: botId, role: "assistant", result } : x)));
     } catch (e) {
-      setResult(null);
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setBusy(false);
+      const error = e instanceof Error ? e.message : String(e);
+      setMsgs((m) => m.map((x) => (x.id === botId ? { id: botId, role: "assistant", error } : x)));
     }
   }
 
-  async function onAddPaper() {
-    try {
-      const r = await addPaper(paperName, paperText);
-      setPaperMsg(`Added ${r.added} passage(s). Corpus size: ${r.total}`);
-    } catch (e) {
-      setPaperMsg(e instanceof Error ? e.message : String(e));
-    }
-  }
+  const setField = (k: keyof ExperimentFields) => (e: React.ChangeEvent<HTMLInputElement>) =>
+    setFields({ ...fields, [k]: e.target.value });
+
+  const missingCount = Object.values(fields).filter((v) => !v.trim()).length;
 
   return (
-    <>
-      <header>
-        <h1>HYPOGEN: evidence-checked hypothesis assistant</h1>
-        <p>Demo prototype. FastAPI backend, React + TypeScript frontend.</p>
-      </header>
-      <main>
-        <section>
-          <div className="card">
-            <h2>1. Research question</h2>
-            <label>Question</label>
-            <textarea value={form.question} onChange={set("question")} />
-            <label>Intervention</label>
-            <input value={form.intervention} onChange={set("intervention")} />
-            <label>Comparator</label>
-            <input value={form.comparator} onChange={set("comparator")} />
-            <label>Dataset / task</label>
-            <input value={form.task} onChange={set("task")} />
-            <label>Metric</label>
-            <input value={form.metric} onChange={set("metric")} />
-            <label>What result would disprove it?</label>
-            <input value={form.disconfirm} onChange={set("disconfirm")} />
-            <button disabled={busy} onClick={run}>
-              {busy ? "Working..." : "Generate and check"}
-            </button>
-          </div>
-          <div className="card">
-            <h2>Add your own paper text</h2>
-            <label>Paper name</label>
-            <input value={paperName} placeholder="e.g. My Paper (2025)" onChange={(e) => setPaperName(e.target.value)} />
-            <label>Paste text (blank line between passages)</label>
-            <textarea value={paperText} onChange={(e) => setPaperText(e.target.value)} />
-            <button className="secondary" onClick={onAddPaper}>
-              Add to corpus
-            </button>
-            <div className="small">{paperMsg}</div>
-          </div>
-          <div className="note">
-            The checker is a lexical baseline standing in for the trained neural verifier. Retrieval is TF-IDF. Sample
-            passages are illustrative, not quotes from real papers.
-          </div>
-        </section>
+    <div className="app">
+      <Sidebar
+        papers={papers}
+        onChanged={refreshPapers}
+        onNew={() => setMsgs([])}
+        onWalkthrough={() => setShowWalk(true)}
+      />
 
-        <section>
-          {error && <div className="card warn">{error}</div>}
-          {!result && !error && (
-            <div className="card">
-              <div className="small">Results appear here.</div>
+      <div className="main">
+        <div className="honesty">
+          <b>Demo mode:</b> keyword-based checker, TF-IDF retrieval, illustrative sample papers. The trained neural
+          verifier is planned work. No accuracy figures are claimed.
+        </div>
+        {backendDown && (
+          <div className="banner-err">
+            Cannot reach the backend. Start it with <code>uvicorn main:app --port 8000</code> inside the backend folder.
+          </div>
+        )}
+
+        <div className="thread">
+          {msgs.length === 0 && (
+            <div className="empty">
+              <h1>What do you want to investigate?</h1>
+              <p>
+                Ask a research question. HYPOGEN retrieves evidence, drafts an <b>untested</b> prediction, checks each
+                premise for <b>supporting and conflicting</b> passages, and tells you what is missing.
+              </p>
+              <div className="examples">
+                {EXAMPLES.map((e) => (
+                  <button key={e} className="example" onClick={() => send(e)}>
+                    {e}
+                  </button>
+                ))}
+              </div>
+              <button className="ghost" onClick={() => setShowWalk(true)}>
+                ▶ Take the 2-minute walkthrough
+              </button>
             </div>
           )}
-          {result && <Results r={result} />}
-        </section>
-      </main>
-    </>
-  );
-}
 
-function Results({ r }: { r: HypothesisResult }) {
-  return (
-    <>
-      <div className="stage">
-        {STAGES.map((s) => (
-          <span key={s}>{s}</span>
-        ))}
-      </div>
-
-      <div className="card">
-        <h2>Candidate hypothesis</h2>
-        <p>
-          <b>Untested prediction:</b> {r.prediction}
-        </p>
-        <p className="small">Drafted by: {r.drafter}</p>
-        <p>
-          <b>Assumption:</b> {r.assumption}
-        </p>
-      </div>
-
-      <div className="card">
-        <h2>Factual premises and evidence</h2>
-        {r.premises.map((p) => (
-          <div className="premise" key={p.cited.id}>
-            <span className={`badge ${p.label}`}>{p.label}</span> {p.premise}
-            <div className="cite">
-              cited: {p.cited.id} | {p.cited.paper} | p.{p.cited.page} | citation{" "}
-              {p.citation_valid ? "resolves" : "INVALID"}
-            </div>
-            {p.evidence.length === 0 && <div className="ev">No other passage in this corpus bears on this premise.</div>}
-            {p.evidence.map((e) => (
-              <div className="ev" key={e.id}>
-                <span className={`badge ${e.relation}`}>{e.relation}</span>{" "}
-                <span className="cite">
-                  {e.id} (sim {e.similarity})
-                </span>{" "}
-                {e.text}
+          {msgs.map((m) =>
+            m.role === "user" ? (
+              <div className="bubble user" key={m.id}>
+                {m.text}
               </div>
-            ))}
+            ) : (
+              <div className="assistant" key={m.id}>
+                <div className="avatar">H</div>
+                <div className="a-body">
+                  {m.pending && <div className="thinking">Retrieving evidence and checking premises…</div>}
+                  {m.error && <div className="banner-err">{m.error}</div>}
+                  {m.result && <Result r={m.result} />}
+                </div>
+              </div>
+            )
+          )}
+          <div ref={bottom} />
+        </div>
+
+        <div className="composer">
+          {showFields && (
+            <div className="fields">
+              {(Object.keys(FIELD_LABELS) as (keyof ExperimentFields)[]).map((k) => (
+                <label key={k}>
+                  {FIELD_LABELS[k]}
+                  <input value={fields[k]} onChange={setField(k)} />
+                </label>
+              ))}
+            </div>
+          )}
+          <div className="input-row">
+            <textarea
+              value={input}
+              placeholder="Ask a research question…"
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  send(input);
+                }
+              }}
+            />
+            <button disabled={busy || !input.trim()} onClick={() => send(input)}>
+              {busy ? "Working…" : "Send"}
+            </button>
           </div>
-        ))}
+          <div className="composer-foot">
+            <button className="link" onClick={() => setShowFields(!showFields)}>
+              {showFields ? "Hide" : "Edit"} experiment details
+            </button>
+            {missingCount > 0 && <span className="missing"> · {missingCount} field(s) empty, will be flagged</span>}
+          </div>
+        </div>
       </div>
 
-      <div className="card">
-        <h2>Experiment plan</h2>
-        {EXPERIMENT_KEYS.map((k) => (
-          <div key={k}>
-            <b>{k.replace("_", " ")}:</b>{" "}
-            {r.experiment[k] ? r.experiment[k] : <span className="missing">MISSING</span>}
-          </div>
-        ))}
-      </div>
-
-      <div className="card">
-        <h2>Warnings</h2>
-        {r.warnings.map((w, i) => (
-          <div className="warn" key={i}>
-            {w}
-          </div>
-        ))}
-      </div>
-
-      <div className="card">
-        <h2>Retrieved passages</h2>
-        {r.retrieved.map((p) => (
-          <div className="ev" key={p.id}>
-            <span className="cite">
-              {p.id} score {p.score} | {p.paper} p.{p.page}
-            </span>{" "}
-            {p.text}
-          </div>
-        ))}
-      </div>
-    </>
+      {showWalk && (
+        <Walkthrough
+          onClose={() => setShowWalk(false)}
+          onTry={() => {
+            setShowWalk(false);
+            send(EXAMPLE_QUESTION);
+          }}
+        />
+      )}
+    </div>
   );
 }

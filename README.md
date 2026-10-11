@@ -25,6 +25,11 @@ Frontend (Node 18+):
 
 Open http://localhost:5173 (Vite proxies `/api` to the backend).
 
+## Documentation
+
+- **[docs/PRESENTATION_GUIDE.md](docs/PRESENTATION_GUIDE.md)**: 5-minute demo script, likely questions, and what NOT to claim.
+- In the app, click **How it works (walkthrough)** for a guided tour.
+
 ## What it does
 
 1. Retrieves relevant passages for a research question (TF-IDF).
@@ -41,13 +46,14 @@ Paste your own paper text in the UI to add passages to the corpus.
 | Endpoint | Purpose |
 |---|---|
 | `GET /api/health` | Status and corpus size |
+| `GET /api/papers` | Papers with their passages |
 | `GET /api/corpus` | All stored passages |
 | `POST /api/hypothesis` | Run retrieve, draft, check |
 | `POST /api/paper` | Add pasted paper text as passages |
 
 ## Honest scope
 
-- Retrieval is TF-IDF, not MiniLM embeddings.
+- Retrieval is TF-IDF, not MiniLM embeddings. A passage counts as evidence only if its similarity is at least 0.2 (`MIN_EVIDENCE_SIM` in `backend/pipeline.py`).
 - The verifier is a **lexical baseline** (overlap plus contrast cues). It is NOT the trained neural verifier from the blueprint; it stands in so the whole pipeline can be shown working.
 - Optional drafting: run Ollama with `qwen3:1.7b` (or set `OLLAMA_MODEL`).
 - `backend/sample_corpus.json` is illustrative text written for this demo, not quotes from real papers.

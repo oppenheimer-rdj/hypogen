@@ -37,6 +37,11 @@ def health():
     return {"ok": True, "passages": len(pipeline.PASSAGES)}
 
 
+@app.get("/api/papers")
+def papers():
+    return {"papers": pipeline.list_papers()}
+
+
 @app.get("/api/corpus")
 def corpus():
     return {"passages": pipeline.PASSAGES}
